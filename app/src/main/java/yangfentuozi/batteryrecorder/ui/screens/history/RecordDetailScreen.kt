@@ -48,6 +48,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.edit
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -55,6 +58,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import yangfentuozi.batteryrecorder.R
+import yangfentuozi.batteryrecorder.ipc.Service
+import yangfentuozi.batteryrecorder.server.recorder.IRecordListener
 import yangfentuozi.batteryrecorder.shared.data.BatteryStatus
 import yangfentuozi.batteryrecorder.shared.data.RecordsFile
 import yangfentuozi.batteryrecorder.ui.components.charts.PowerCurveMode
@@ -156,6 +161,49 @@ fun RecordDetailScreen(
     ) { uri ->
         if (uri != null) {
             viewModel.exportRecord(context, recordsFile, uri)
+        }
+    }
+
+    val detailRecordListener = remember(recordsFile) {
+        object : IRecordListener.Stub() {
+            override fun onRecord(timestamp: Long, power: Long, status: BatteryStatus, temp: Int) {
+                viewModel.onRecordSampleForDetail(
+                    context = context,
+                    recordsFile = recordsFile
+                )
+            }
+
+            override fun onChangedCurrRecordsFile(newRecordsFile: RecordsFile) {
+                viewModel.onCurrentRecordsFileChangedForDetail(
+                    context = context,
+                    recordsFile = newRecordsFile
+                )
+            }
+        }
+    }
+
+    DisposableEffect(recordsFile) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    Service.service?.registerRecordListener(detailRecordListener)
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    Service.service?.unregisterRecordListener(detailRecordListener)
+                }
+                else -> {}
+            }
+        }
+        val lifecycleOwner = LocalLifecycleOwner.current
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            Service.service?.registerRecordListener(detailRecordListener)
+        }
+
+        onDispose {
+            Service.service?.unregisterRecordListener(detailRecordListener)
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 

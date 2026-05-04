@@ -627,6 +627,7 @@ class HistorySharedViewModel : ViewModel() {
         rawRecordDetail = null
         rawRecordDetailPowerStats = null
         rawRecordAppSwitchCount = 0
+        currentDetailRecordsFile = null
         _recordDetail.value = null
         _recordDetailSummaryUiState.value = null
         _recordDetailReferenceVoltageV.value = null
@@ -634,6 +635,68 @@ class HistorySharedViewModel : ViewModel() {
         recordLineRecords = emptyList()
         _recordAppDetailEntries.value = emptyList()
         _recordChartUiState.value = RecordDetailChartUiState()
+    }
+
+    /**
+     * 处理实时采样事件，用于详情页在记录进行中时自动刷新。
+     *
+     * @param context 应用上下文。
+     * @param recordsFile 当前详情页对应的记录文件。
+     * @return 仅当 recordsFile 与当前详情页对齐时才触发重新加载。
+     */
+    fun onRecordSampleForDetail(
+        context: Context,
+        recordsFile: RecordsFile
+    ) {
+        val currentFile = currentDetailRecordsFile ?: return
+        if (currentFile.name != recordsFile.name) return
+
+        val detailToken = detailLoadToken
+        viewModelScope.launch {
+            try {
+                val loadedState = LoadRecordDetailUseCase.execute(
+                    context = context,
+                    recordsFile = recordsFile,
+                    recordIntervalMs = recordDetailSamplingIntervalMs
+                )
+                if (detailToken != detailLoadToken) return@launch
+                if (loadedState == null) return@launch
+
+                rawRecordDetail = loadedState.detail
+                rawRecordDetailPowerStats = loadedState.powerStats
+                rawRecordAppSwitchCount = loadedState.appSwitchCount
+                recordLineRecords = loadedState.lineRecords
+                rawRecordChartSource = loadedState.rawChartPoints
+                _recordDetailReferenceVoltageV.value = loadedState.referenceVoltageV
+                _recordAppDetailEntries.value = loadedState.appEntries
+                applyRecordDetailDisplayConfig()
+                requestRecordChartUiStateRecompute(
+                    detailType = recordsFile.type,
+                    expectedDetailToken = detailToken
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                LoggerX.e(TAG, "[记录详情] 实时刷新失败: file=${recordsFile.name} reason=${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 处理当前记录文件切换通知。
+     *
+     * @param context 应用上下文。
+     * @param recordsFile 服务端最新当前记录文件。
+     * @return 如果当前详情页正在查看该记录，则触发重新加载。
+     */
+    fun onCurrentRecordsFileChangedForDetail(
+        context: Context,
+        recordsFile: RecordsFile
+    ) {
+        val currentFile = currentDetailRecordsFile ?: return
+        if (currentFile.name != recordsFile.name) return
+
+        loadRecord(context, recordsFile)
     }
 
     /**
