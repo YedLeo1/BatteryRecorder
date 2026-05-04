@@ -182,7 +182,8 @@ fun RecordDetailScreen(
         }
     }
 
-    DisposableEffect(recordsFile) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(recordsFile, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> {
@@ -194,7 +195,6 @@ fun RecordDetailScreen(
                 else -> {}
             }
         }
-        val lifecycleOwner = LocalLifecycleOwner.current
         lifecycleOwner.lifecycle.addObserver(observer)
 
         if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
