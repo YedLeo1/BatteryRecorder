@@ -10,8 +10,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    if: ${{ github.repository_owner == 'Itosang' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[skip ci]')) }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -322,41 +320,3 @@ jobs:
           files: |
             ${{ steps.buildWithGradle.outputs.releaseApk }}
             ${{ steps.buildWithGradle.outputs.mappingFile }}
-
-      - name: Publish to Telegram
-        if: success() && steps.telegram.outputs.shouldPush == 'true'
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN != '' && secrets.BOT_TOKEN || vars.BOT_TOKEN }}
-          CHAT_ID: -1003856065409
-          MESSAGE_THREAD_ID: ${{ steps.telegram.outputs.threadId }}
-          CAPTION_FILE: ${{ steps.telegram.outputs.captionFile }}
-          DOCUMENT_FILE: ${{ steps.buildWithGradle.outputs.releaseApk }}
-        run: |
-          set -euo pipefail
-
-          apiBase="https://api.telegram.org/bot$BOT_TOKEN"
-          caption=`cat "$CAPTION_FILE"`
-
-          if [ -z "$BOT_TOKEN" ]; then
-            echo "[Telegram] BOT_TOKEN 未配置" >&2
-            exit 1
-          fi
-
-          telegram_api() {
-            method="$1"
-            shift
-
-            response=`curl --silent --show-error --request POST "$apiBase/$method" "$@"`
-            if echo "$response" | grep -q '"ok":true'; then
-              return 0
-            fi
-
-            echo "[Telegram/$method] $response" >&2
-            return 1
-          }
-
-          telegram_api sendDocument \
-            --form chat_id="$CHAT_ID" \
-            --form message_thread_id="$MESSAGE_THREAD_ID" \
-            --form-string caption="$caption" \
-            --form document=@"$DOCUMENT_FILE"

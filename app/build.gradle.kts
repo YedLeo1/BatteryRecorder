@@ -10,20 +10,16 @@ plugins {
 
 val ksFile = rootProject.file("signing.properties")
 val props = Properties()
-if (ksFile.canRead()) {
+val hasSigningConfig = ksFile.canRead()
+
+// 只在有签名文件时才创建 sign 配置
+if (hasSigningConfig) {
     props.load(FileInputStream(ksFile))
     android.signingConfigs.create("sign").apply {
         storeFile = file(props["KEYSTORE_FILE"] as String)
         storePassword = props["KEYSTORE_PASSWORD"] as String
         keyAlias = props["KEYSTORE_ALIAS"] as String
         keyPassword = props["KEYSTORE_ALIAS_PASSWORD"] as String
-    }
-} else {
-    android.signingConfigs.create("sign").apply {
-        storeFile = android.signingConfigs.getByName("debug").storeFile
-        storePassword = android.signingConfigs.getByName("debug").storePassword
-        keyAlias = android.signingConfigs.getByName("debug").keyAlias
-        keyPassword = android.signingConfigs.getByName("debug").keyPassword
     }
 }
 
@@ -52,10 +48,22 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles("proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("sign")
+            // 只在有签名配置时才设置 signingConfig
+            if (hasSigningConfig) {
+                signingConfig = signingConfigs.getByName("sign")
+            } else {
+                // 不设置 signingConfig，release 构建将不会被签名
+                // 如果想要 debug 签名，可以取消下面的注释
+                // signingConfig = signingConfigs.getByName("debug")
+            }
         }
         debug {
-            signingConfig = signingConfigs.getByName("sign")
+            // debug 默认使用 debug 证书，不需要显式设置
+            // 如果你想 debug 也不签名，可以注释掉下面这行
+            // signingConfig = signingConfigs.getByName("sign")
+            
+            // 如果之前 debug 使用了 sign 配置，现在移除即可
+            // debug 会自动使用 Android 的 debug 证书
         }
     }
 

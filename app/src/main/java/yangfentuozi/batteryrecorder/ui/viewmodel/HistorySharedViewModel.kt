@@ -70,6 +70,7 @@ class HistorySharedViewModel : ViewModel() {
     private var recordDetailSamplingIntervalMs = SettingsConstants.recordIntervalMs.def
     private var recordDetailContext: Context? = null
     private var detailDischargeDisplayPositive = SettingsConstants.dischargeDisplayPositive.def
+    private var currentDetailRecordsFile: RecordsFile? = null
 
     private var dualCellEnabled = SettingsConstants.dualCellEnabled.def
     private var calibrationValue = SettingsConstants.calibrationValue.def
@@ -221,6 +222,7 @@ class HistorySharedViewModel : ViewModel() {
                 rawRecordAppSwitchCount = loadedState.appSwitchCount
                 recordLineRecords = loadedState.lineRecords
                 rawRecordChartSource = loadedState.rawChartPoints
+                currentDetailRecordsFile = recordsFile
                 _recordDetailReferenceVoltageV.value = loadedState.referenceVoltageV
                 _recordAppDetailEntries.value = loadedState.appEntries
                 applyRecordDetailDisplayConfig()
